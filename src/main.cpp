@@ -6,7 +6,7 @@
 int main(int argc, char *argv[])
 {
   char action = NULL;
-  float param = 0.0;
+  float param = 0.0f;
   Liter liter;
 
   while (action != 'x')
@@ -16,12 +16,17 @@ int main(int argc, char *argv[])
 #endif
     std::cin.clear();
     std::cin >> action;
-    if (action == 's')
+    if (action == 'm' || action == 's')
     {
 #if DEBUG
       std::cout << "Param: ";
 #endif
       std::cin >> param;
+    }
+
+    if (action == 'x')
+    {
+      return 0;
     }
 
     std::cout << liter.ParseAction(action, param) << std::endl;  // Feedback volume level.

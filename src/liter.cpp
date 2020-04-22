@@ -90,8 +90,16 @@ float Liter::Down()
 
 float Liter::Mute(float mute)
 {
-  this->hr = this->endpoint->SetMute(mute == 0.0f, NULL);
-  return this->Get();
+  if (mute)
+  {
+    this->hr = this->endpoint->SetMute(true, NULL);
+    return 0.0f;
+  }
+  else
+  {
+    this->hr = this->endpoint->SetMute(false, NULL);
+    return this->Get();
+  }
 }
 
 float Liter::Set(float level)
