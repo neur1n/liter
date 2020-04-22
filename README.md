@@ -63,15 +63,25 @@ add_executable(liter src/main.cpp src/liter.cpp)
 
 ## Usage
 The executable of liter takes no arguments, instead, it takes in arguments
-after it is launched.
+after it is launched. This makes it keep track of the endpoint device we are
+interfacing, instead of getting the device every time an action is performed.
 
 For demonstration or debugging purpose, one may set the `DEBUG` macro to `true`
 in `main.cpp` to enable echoing of the inputs. The following demonstrations are
 based on such configuration.
 
+### Exit
+To terminate the program, pass `x` (i.e. "eXit") when `Action:` is prompted in
+the terminal.
+```
+$ liter
+Action: x
+$
+```
+
 ### Get Volume
-To get the current volume level (0.0 ~ 1.0), pass `g` (i.e. "get") when
-`Action:` is prompted in the terminal. Then the volume level will be shown as
+To get the current volume level (0.0 ~ 1.0), pass `g` ("get") when `Action:` is
+prompted in the terminal. Then the volume level will be shown as
 `Volume: <level>`. In Windows, the range of volume is from 0 to 100, therefore
 a volume level 0.1 means a volume of 10.
 ```
