@@ -5,36 +5,6 @@ Liter::Liter()
 {
   CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
   this->UpdateDevice();
-
-  // this->hr = CoCreateInstance(
-  //     __uuidof(MMDeviceEnumerator),
-  //     NULL,
-  //     CLSCTX_ALL,
-  //     __uuidof(IMMDeviceEnumerator),
-  //     (void**)&this->device_enum);
-
-  // this->hr = this->device_enum->GetDefaultAudioEndpoint(
-  //     EDataFlow::eRender, ERole::eConsole, &this->device);
-
-  // this->hr = this->device->Activate( 
-  //     __uuidof(IAudioEndpointVolume), 
-  //     CLSCTX_ALL, 
-  //     NULL, 
-  //     (void**)&this->endpoint);
-
-  // IAudioSessionManager2 *mgr = NULL;
-
-  // this->hr = this->device->Activate(
-  //     __uuidof(IAudioSessionManager2), 
-  //     CLSCTX_ALL, 
-  //     NULL, 
-  //     (void**)&mgr);
-
-  // this->hr = mgr->GetAudioSessionControl(&GUID_NULL, FALSE, &this->session_ctrl);
-  // this->hr = this->session_ctrl->RegisterAudioSessionNotification(this);
-  // SAFE_RELEASE(mgr);
-
-  // this->hr = this->endpoint->GetMasterVolumeLevelScalar(&this->volume);
 }
 
 Liter::~Liter()
