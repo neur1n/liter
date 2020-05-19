@@ -3,20 +3,44 @@
 Liter::Liter()
   :ref_cnt(1)
 {
-  CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
-  this->UpdateDevice();
 }
 
 Liter::~Liter()
 {
-  this->hr = this->session_ctrl->UnregisterAudioSessionNotification(this);
   SAFE_RELEASE(this->device_enum);
   SAFE_RELEASE(this->device);
-  SAFE_RELEASE(this->session_ctrl);
   SAFE_RELEASE(this->endpoint);
 }
 
-float Liter::ParseAction(char action, float param)
+// ===================================================================== Public
+HRESULT Liter::Initialize()
+{
+  this->hr = CoCreateInstance(
+      __uuidof(MMDeviceEnumerator),
+      NULL,
+      CLSCTX_ALL,
+      __uuidof(IMMDeviceEnumerator),
+      (void**)&this->device_enum);
+
+  if (SUCCEEDED(this->hr))
+  {
+    this->hr = this->device_enum->RegisterEndpointNotificationCallback(this);
+    if (SUCCEEDED(this->hr))
+    {
+      this->hr = this->AttachDefaultDevice();
+    }
+  }
+
+  return this->hr;
+}
+
+void Liter::Dispose()
+{
+  this->DettachDefaultDevice();
+  this->device_enum->UnregisterEndpointNotificationCallback(this);
+}
+
+float Liter::Action(char action, float param)
 {
   switch (action)
   {
@@ -41,39 +65,49 @@ float Liter::ParseAction(char action, float param)
   }
 }
 
-HRESULT Liter::UpdateDevice()
+// ==================================================================== Private
+HRESULT Liter::AttachDefaultDevice()
 {
-  this->hr = CoCreateInstance(
-      __uuidof(MMDeviceEnumerator),
-      NULL,
-      CLSCTX_ALL,
-      __uuidof(IMMDeviceEnumerator),
-      (void**)&this->device_enum);
-
   this->hr = this->device_enum->GetDefaultAudioEndpoint(
       EDataFlow::eRender, ERole::eConsole, &this->device);
 
-  this->hr = this->device->Activate( 
-      __uuidof(IAudioEndpointVolume), 
-      CLSCTX_ALL, 
-      NULL, 
-      (void**)&this->endpoint);
+  if (SUCCEEDED(this->hr))
+  {
+    this->hr = this->device->Activate( 
+        __uuidof(IAudioEndpointVolume), 
+        CLSCTX_ALL, 
+        NULL, 
+        (void**)&this->endpoint);
 
-  IAudioSessionManager2 *mgr = NULL;
+    if (SUCCEEDED(this->hr))
+    {
+      this->hr = this->endpoint->RegisterControlChangeNotify(this);
+    }
+  }
 
-  this->hr = this->device->Activate(
-      __uuidof(IAudioSessionManager2), 
-      CLSCTX_ALL, 
-      NULL, 
-      (void**)&mgr);
-
-  this->hr = mgr->GetAudioSessionControl(&GUID_NULL, FALSE, &this->session_ctrl);
-  this->hr = this->session_ctrl->RegisterAudioSessionNotification(this);
-  SAFE_RELEASE(mgr);
-
-  this->hr = this->endpoint->GetMasterVolumeLevelScalar(&this->volume);
+  this->Get();
 
   return this->hr;
+}
+
+void Liter::DettachDefaultDevice()
+{
+  if (this->endpoint != NULL)
+  {
+    this->endpoint->UnregisterControlChangeNotify(this);
+  }
+
+  /* Should not release according to
+     https://docs.microsoft.com/en-us/windows/win32/api/mmdeviceapi/nn-mmdeviceapi-immnotificationclient
+  */
+  // this->endpoint->Release();
+
+  // if (this->device != NULL)
+  // {
+  //   this->device->Release();
+  // }
+
+  // std::cout << "[Dettach]" << std::endl;
 }
 
 float Liter::Up()
@@ -120,6 +154,29 @@ float Liter::Get()
   return this->volume;
 }
 
+HRESULT Liter::PrintDeviceName(LPCWSTR pwstrDeviceId)
+{
+  IPropertyStore *prop = NULL;
+  PROPVARIANT var;
+  IMMDevice *dev = NULL;
+  HRESULT hr = S_OK;
+
+  PropVariantInit(&var);
+
+  hr = this->device_enum->GetDevice(pwstrDeviceId, &dev);
+  hr = dev->OpenPropertyStore(STGM_READ, &prop);
+  hr = prop->GetValue(PKEY_Device_FriendlyName, &var);
+
+  std::wcout << var.pwszVal << std::endl;
+
+  PropVariantInit(&var);
+
+  SAFE_RELEASE(prop);
+  SAFE_RELEASE(dev);
+
+  return hr;
+}
+
 // ================================================================= Overriding
 HRESULT Liter::QueryInterface(REFIID iid, void **object)
 {
@@ -129,19 +186,23 @@ HRESULT Liter::QueryInterface(REFIID iid, void **object)
   }
   else if (iid == IID_IUnknown)
   {
-    *object = static_cast<IUnknown*>(static_cast<IAudioSessionEvents*>(this));
-    this->AddRef();
+    *object = static_cast<IUnknown*>(static_cast<IMMNotificationClient*>(this));
   }
-  else if (iid == __uuidof(IAudioSessionEvents))
+  else if (iid == __uuidof(IMMNotificationClient))
   {
-    *object = static_cast<IAudioSessionEvents*>(this);
-    this->AddRef();
+    *object = static_cast<IMMNotificationClient*>(this);
+  }
+  else if (iid == __uuidof(IAudioEndpointVolumeCallback))
+  {
+    *object = static_cast<IAudioEndpointVolumeCallback*>(this);
   }
   else
   {
+    *object = NULL;
     return E_NOINTERFACE;
   }
 
+  this->AddRef();
   return S_OK;
 }
 
@@ -161,8 +222,29 @@ ULONG Liter::Release()
   return v;
 }
 
-HRESULT Liter::OnSessionDisconnected(AudioSessionDisconnectReason reason)
+/* This function will be called THREE times according to
+  https://docs.microsoft.com/en-us/windows/win32/api/mmdeviceapi/nf-mmdeviceapi-immnotificationclient-ondefaultdevicechanged#remarks
+*/
+HRESULT Liter::OnDefaultDeviceChanged(EDataFlow flow, ERole role, LPCWSTR pwstrDefaultDeviceId)
 {
-  this->hr = this->UpdateDevice();
+  // std::cout << "[Changed] ";
+  // this->PrintDeviceName(pwstrDefaultDeviceId);
+  this->DettachDefaultDevice();
+  this->hr = this->AttachDefaultDevice();
+  std::cout << this->volume << std::endl;
   return this->hr;
+}
+
+HRESULT Liter::OnNotify(PAUDIO_VOLUME_NOTIFICATION_DATA notify)
+{
+  if (notify->bMuted)
+  {
+    this->Mute(1.0f);
+  }
+  else
+  {
+    this->volume = this->Mute(0.0f);
+  }
+
+  return S_OK;
 }

@@ -5,31 +5,50 @@
 
 int main(int argc, char *argv[])
 {
-  char action = NULL;
-  float param = 0.0f;
-  Liter liter;
+  HRESULT hr;
 
-  while (action != 'x')
+  hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+
+  if (SUCCEEDED(hr))
   {
-#if DEBUG
-    std::cout << "Action: ";
-#endif
-    std::cin.clear();
-    std::cin >> action;
-    if (action == 'm' || action == 's')
-    {
-#if DEBUG
-      std::cout << "Param: ";
-#endif
-      std::cin >> param;
-    }
+    char action = NULL;
+    float param = 0.0f;
+    Liter *liter = new Liter;
 
-    if (action == 'x')
-    {
-      return 0;
-    }
+    hr = liter->Initialize();
 
-    std::cout << liter.ParseAction(action, param) << std::endl;  // Feedback volume level.
+    if (SUCCEEDED(hr))
+    {
+      while (action != 'x')
+      {
+#if DEBUG
+        std::cout << "Action: ";
+#endif
+        std::cin.clear();
+        std::cin >> action;
+        if (action == 'm' || action == 's')
+        {
+#if DEBUG
+          std::cout << "Param: ";
+#endif
+          std::cin >> param;
+        }
+
+        if (action == 'x')
+        {
+          liter->Dispose();
+          liter->Release();
+          CoUninitialize();
+          return 0;
+        }
+
+        std::cout << liter->Action(action, param) << std::endl;
+      }
+
+      liter->Dispose();
+      liter->Release();
+      CoUninitialize();
+    }
   }
 
   return 0;

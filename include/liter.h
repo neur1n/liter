@@ -7,13 +7,6 @@
 #include <mmdeviceapi.h>
 #include <functiondiscoverykeys_devpkey.h>  // Must put at last
 
-#define EXIT_ON_ERROR(hres)  \
-          if (FAILED(hres)) \
-          { \
-            std::cout << "HRESULT: 0x" << std::hex << hres << std::endl; \
-            goto Exit; \
-          }
-
 #define SAFE_RELEASE(punk) \
           if ((punk) != NULL) \
           { \
@@ -21,13 +14,14 @@
             (punk) = NULL; \
           }
 
-class Liter: public IAudioSessionEvents
+class Liter: public IMMNotificationClient, IAudioEndpointVolumeCallback
 {
 public:
   Liter();
-  ~Liter();
 
-  float ParseAction(char action, float param);
+  HRESULT Initialize();
+  void Dispose();
+  float Action(char action, float param);
 
   STDMETHOD(QueryInterface)(REFIID riid, void **object);
   STDMETHOD_(ULONG, AddRef)();
@@ -38,26 +32,31 @@ private:
   HRESULT hr;
   IMMDeviceEnumerator *device_enum = NULL;
   IMMDevice *device = NULL;
-  IAudioSessionControl *session_ctrl = NULL;
 
   IAudioEndpointVolume *endpoint = NULL;
   float volume = 0.0f;
 
-  HRESULT UpdateDevice();
+  ~Liter();
+
+  HRESULT AttachDefaultDevice();
+  void DettachDefaultDevice();
 
   float Up();
   float Down();
   float Mute(float mute);
   float Set(float level);
   float Get();
+  std::string DefaultDeviceName();
 
-  STDMETHOD(OnChannelVolumeChanged)(DWORD, float[], DWORD, LPCGUID) {return S_OK;};
-  STDMETHOD(OnDisplayNameChanged)(LPCWSTR, LPCGUID) {return S_OK;};
-  STDMETHOD(OnGroupingParamChanged)(LPCGUID, LPCGUID) {return S_OK;};
-  STDMETHOD(OnIconPathChanged)(LPCWSTR, LPCGUID) {return S_OK;};
-  STDMETHOD(OnSimpleVolumeChanged)(float, BOOL, LPCGUID) {return S_OK;};
-  STDMETHOD(OnStateChanged)(AudioSessionState) {return S_OK;};
-  STDMETHOD(OnSessionDisconnected)(AudioSessionDisconnectReason reason);
+  HRESULT PrintDeviceName(LPCWSTR pwstrDeviceId);
+
+  STDMETHOD(OnDefaultDeviceChanged)(EDataFlow, ERole, LPCWSTR);
+  STDMETHOD(OnNotify)(PAUDIO_VOLUME_NOTIFICATION_DATA);
+
+  STDMETHOD(OnDeviceAdded)(LPCWSTR) {return S_OK;};
+  STDMETHOD(OnDeviceRemoved)(LPCWSTR) {return S_OK;};
+  STDMETHOD(OnDeviceStateChanged)(LPCWSTR, DWORD) {return S_OK;};
+  STDMETHOD(OnPropertyValueChanged)(LPCWSTR, const PROPERTYKEY) {return S_OK;};
 };
 
 #endif // LITER
